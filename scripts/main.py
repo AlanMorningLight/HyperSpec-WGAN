@@ -23,6 +23,7 @@ ip = HyperspectralScene(name='Indian Pines',
                         palette_path='indian-pines/data/plot-palette.csv')
 
 # %%
+# Data Exploration for Indian Pines
 ip_DE = copy(ip)
 ip_DE.__class__ = DataExploration
 ip_DE.fit_scaler()
@@ -36,6 +37,7 @@ ip_DE.plot_TSNE(plot_path="indian-pines/plots/t-SNE-projection.svg")
 ip_DE.plot_gt(plot_path="indian-pines/plots/ground-truth-map.svg")
 
 # %%
+# Train 1D-CNN for Indian Pines
 ip_CNN_1D = copy(ip)
 ip_CNN_1D.__class__ = Train1DCNN
 ip_CNN_1D.fit_scaler()
@@ -46,6 +48,7 @@ ip_CNN_1D.fit_CNN_1D(model_dir="indian-pines/model/CNN-1D")
 ip_CNN_1D.save_history(history_dir="indian-pines/model/CNN-1D")
 
 # %%
+# Train 3D-CNN for Indian Pines
 ip_CNN_3D = copy(ip)
 ip_CNN_3D.__class__ = Train3DCNN
 ip_CNN_3D.fit_scaler()
@@ -56,12 +59,13 @@ ip_CNN_3D.fit_CNN_3D(model_dir="indian-pines/model/CNN-3D")
 ip_CNN_3D.save_history(history_dir="indian-pines/model/CNN-3D")
 
 # %%
+# Evaluate 1D-CNN for Indian Pines
 ip_CNN_1D_eval = copy(ip)
 ip_CNN_1D_eval.__class__ = EvaluateCNN
-ip_CNN_1D_eval.load_history(acc_path="indian-pines/model/CNN-1D/accuracy.hdf5",
-                            loss_path="indian-pines/model/CNN-1D/loss.hdf5")
 ip_CNN_1D_eval.load_model(network='1D-CNN',
-                          model_path="indian-pines/model/CNN-1D/model.hdf5")
+                          model_path="indian-pines/model/CNN-1D/model.hdf5",
+                          acc_path="indian-pines/model/CNN-1D/accuracy.hdf5",
+                          loss_path="indian-pines/model/CNN-1D/loss.hdf5")
 ip_CNN_1D_eval.load_data(X_all_path="indian-pines/model/CNN-1D/X_all.hdf5",
                          X_test_path="indian-pines/model/CNN-1D/X_test.hdf5",
                          y_test_path="indian-pines/model/CNN-1D/y_test.hdf5")
@@ -77,12 +81,13 @@ ip_CNN_1D_eval.plot_pred(
     plot_path="indian-pines/plots/CNN-1D/predicted-map.svg")
 
 # %%
+# Evaluate 3D-CNN for Indian Pines
 ip_CNN_3D_eval = copy(ip)
 ip_CNN_3D_eval.__class__ = EvaluateCNN
-ip_CNN_3D_eval.load_history(acc_path="indian-pines/model/CNN-3D/accuracy.hdf5",
-                            loss_path="indian-pines/model/CNN-3D/loss.hdf5")
 ip_CNN_3D_eval.load_model(network='3D-CNN',
-                          model_path="indian-pines/model/CNN-3D/model.hdf5")
+                          model_path="indian-pines/model/CNN-3D/model.hdf5",
+                          acc_path="indian-pines/model/CNN-3D/accuracy.hdf5",
+                          loss_path="indian-pines/model/CNN-3D/loss.hdf5")
 ip_CNN_3D_eval.load_data(X_all_path="indian-pines/model/CNN-3D/X_all.hdf5",
                          X_test_path="indian-pines/model/CNN-3D/X_test.hdf5",
                          y_test_path="indian-pines/model/CNN-3D/y_test.hdf5")

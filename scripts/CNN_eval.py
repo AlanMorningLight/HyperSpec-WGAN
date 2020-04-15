@@ -27,15 +27,12 @@ class EvaluateCNN(HyperspectralScene):
     y_pred: np.ndarray
     y_test_pred: np.ndarray
 
-    # Loads accuracy and loss history from *.hdf5 files
-    def load_history(self, acc_path, loss_path):
-        self.accuracy = pd.read_hdf(path_or_buf=acc_path)
-        self.loss = pd.read_hdf(path_or_buf=loss_path)
-
-    # Loads a CNN model from *.hdf5 file
-    def load_model(self, network, model_path):
+    # Loads a CNN model and it's training history from *.hdf5 files
+    def load_model(self, network, model_path, acc_path, loss_path):
         self.network = network
         self.model = models.load_model(filepath=model_path)
+        self.accuracy = pd.read_hdf(path_or_buf=acc_path)
+        self.loss = pd.read_hdf(path_or_buf=loss_path)
 
     # Loads testing data from *.hdf5 file
     def load_data(self, X_all_path, X_test_path, y_test_path):
@@ -68,12 +65,12 @@ class EvaluateCNN(HyperspectralScene):
                style='white',
                palette=sb.color_palette(['#C8102E', '#00B388']),
                font='serif',
-               rc={'figure.figsize': (11, 8.5)})
+               rc={'figure.figsize': (9, 6.5)})
         figure = plt.figure(constrained_layout=True)
         gs = GridSpec(nrows=3,
                       ncols=1,
                       figure=figure,
-                      height_ratios=[1, 0.1, 1])
+                      height_ratios=[1, 0.01, 1])
         axes_0 = plt.subplot(gs[0])
         axes_1 = plt.subplot(gs[1])
         axes_2 = plt.subplot(gs[2])
@@ -110,7 +107,7 @@ class EvaluateCNN(HyperspectralScene):
         sb.set(context='paper',
                style='white',
                font='serif',
-               rc={'figure.figsize': (11, 8.5)})
+               rc={'figure.figsize': (6.5, 6.5)})
         figure, axes = plt.subplots(constrained_layout=True)
         conf_plot = sb.heatmap(data=confusion,
                                cmap=sb.color_palette(palette),
@@ -124,11 +121,9 @@ class EvaluateCNN(HyperspectralScene):
         conf_plot.set(title=f'{self.name} {self.network} Confusion Matrix',
                       xlabel='Predicted',
                       ylabel='Actual')
-        conf_plot.set_xticklabels(labels=self.labels,
-                                  rotation=45,
-                                  horizontalalignment='right')
-        conf_plot.set_yticklabels(labels=self.labels,
-                                  rotation=45,
+        conf_plot.set_xticklabels(labels=np.arange(len(self.labels)))
+        conf_plot.set_yticklabels(labels=np.arange(len(self.labels)),
+                                  rotation=0,
                                   horizontalalignment='right')
         figure.savefig(plot_path, format='svg')
         plt.close(fig=figure)
@@ -139,7 +134,7 @@ class EvaluateCNN(HyperspectralScene):
         sb.set(context='paper',
                style='white',
                font='serif',
-               rc={'figure.figsize': (11, 8.5)})
+               rc={'figure.figsize': (9, 6.5)})
         figure, axes = plt.subplots(constrained_layout=True)
         gt_plot = sb.heatmap(data=y_pred,
                              cmap=self.palette,
