@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from scipy.io import loadmat
 
+
 # Data class for a hyperspectral scene
 @dataclass
 class HyperspectralScene:

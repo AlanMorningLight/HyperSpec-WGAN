@@ -4,7 +4,6 @@ from dataclasses import dataclass
 import numpy as np
 from h5py import File
 from pandas import DataFrame
-from scene import HyperspectralScene
 from skimage.util.shape import view_as_windows
 from sklearn.decomposition import PCA
 from sklearn.model_selection import train_test_split
@@ -15,6 +14,9 @@ from tensorflow.keras.constraints import unit_norm
 from tensorflow.keras.layers import Conv3D, Dense, Dropout, Flatten, LeakyReLU
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.utils import to_categorical
+
+from scene import HyperspectralScene
+
 
 # Data class for 1D-CNNs
 @dataclass(init=False)

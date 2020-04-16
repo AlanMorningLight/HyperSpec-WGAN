@@ -6,10 +6,12 @@ import seaborn as sb
 from matplotlib import pyplot as plt
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import ListedColormap
-from scene import HyperspectralScene
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from sklearn.preprocessing import MinMaxScaler
+
+from scene import HyperspectralScene
+
 
 # Data class for data exploration
 @dataclass(init=False)
@@ -111,7 +113,7 @@ class DataExploration(HyperspectralScene):
         colormap = ListedColormap(self.palette)
         colorbar = figure.colorbar(mappable=ScalarMappable(cmap=colormap),
                                    ax=axes)
-        self.__plot_colorbar(figure=figure, axes=axes)
+        self.__plot_colorbar(colorbar=colorbar)
         figure.savefig(plot_path, format='svg')
         plt.close(fig=figure)
 

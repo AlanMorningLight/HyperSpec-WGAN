@@ -9,9 +9,10 @@ from h5py import File
 from matplotlib import pyplot as plt
 from matplotlib.gridspec import GridSpec
 from pandas import DataFrame
-from scene import HyperspectralScene
 from sklearn.metrics import classification_report, confusion_matrix
 from tensorflow.keras import Model, models
+
+from scene import HyperspectralScene
 
 
 # Data class for evaluating CNNs
