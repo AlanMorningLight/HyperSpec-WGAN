@@ -51,11 +51,8 @@ class DataExploration(HyperspectralScene):
         figure, axes = plt.subplots(constrained_layout=True)
         return figure, axes
 
-    # Adds a discrete colorbar with labels to a plot
-    def __plot_colorbar(self, figure, axes):
-        colormap = ListedColormap(self.palette)
-        colorbar = figure.colorbar(mappable=ScalarMappable(cmap=colormap),
-                                   ax=axes)
+    # Adds labels to a discrete colorbar
+    def __label_colorbar(self, colorbar):
         colorbar_range = colorbar.vmax - colorbar.vmin
         num_labels = len(self.labels)
         colorbar.set_ticks([colorbar.vmin
@@ -89,7 +86,10 @@ class DataExploration(HyperspectralScene):
                          f'Explained Variance'),
                  ylabel=(f'Principal Component 2 - {PC2:.1f}% '
                          f'Explained Variance'))
-        self.__plot_colorbar(figure=figure, axes=axes)
+        colormap = ListedColormap(self.palette)
+        colorbar = figure.colorbar(mappable=ScalarMappable(cmap=colormap),
+                                   ax=axes)
+        self.__label_colorbar(colorbar=colorbar)
         figure.savefig(plot_path, format='svg')
         plt.close(fig=figure)
 
@@ -108,17 +108,16 @@ class DataExploration(HyperspectralScene):
         plot.set(title=f'{self.name} t-SNE Projection',
                  xlabel='t-SNE Component 1',
                  ylabel='t-SNE Component 2')
+        colormap = ListedColormap(self.palette)
+        colorbar = figure.colorbar(mappable=ScalarMappable(cmap=colormap),
+                                   ax=axes)
         self.__plot_colorbar(figure=figure, axes=axes)
         figure.savefig(plot_path, format='svg')
         plt.close(fig=figure)
 
     # Plots ground truth classification map
     def plot_gt(self, plot_path):
-        sb.set(context='paper',
-               style='white',
-               font='serif',
-               rc={'figure.figsize': (9, 6.5)})
-        figure, axes = plt.subplots(constrained_layout=True)
+        figure, axes = self.__plot_parameters()
         gt_plot = sb.heatmap(data=self.gt,
                              cmap=self.palette,
                              xticklabels=False,
@@ -127,17 +126,6 @@ class DataExploration(HyperspectralScene):
                              ax=axes)
         gt_plot.set(title=f'{self.name} Ground Truth Classification Map')
         colorbar = gt_plot.collections[0].colorbar
-        colorbar_range = colorbar.vmax - colorbar.vmin
-        num_labels = len(self.labels)
-        colorbar.set_ticks([colorbar.vmin
-                            + 0.5
-                            * colorbar_range
-                            / num_labels
-                            + i
-                            * colorbar_range
-                            / num_labels
-                            for i in range(num_labels)])
-        colorbar.set_ticklabels(self.labels)
-        colorbar.ax.invert_yaxis()
+        self.__label_colorbar(colorbar=colorbar)
         figure.savefig(plot_path, format='svg')
         plt.close(fig=figure)
