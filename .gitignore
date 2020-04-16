@@ -1,2 +1,3 @@
 *.hdf5
 .vscode/
+scripts/__pycache__/
