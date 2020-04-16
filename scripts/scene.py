@@ -21,27 +21,27 @@ class HyperspectralScene:
     X: np.ndarray = field(init=False)
     y: np.ndarray = field(init=False)
 
-    # Load hyperspectral image from *.mat file
+    # Loads a hyperspectral image from a *.mat file
     def load_image(self):
         self.image = list(loadmat(file_name=self.image_path).values())[-1]
         self.X = np.reshape(a=self.image, newshape=(-1, self.image.shape[2]))
 
-    # Load ground truth from *.mat file
+    # Loads the ground truth from a *.mat file
     def load_gt(self):
         self.gt = list(loadmat(file_name=self.gt_path).values())[-1]
         self.y = np.reshape(a=self.gt, newshape=-1)
 
-    # Load class labels from *.csv file
+    # Loads class labels from a *.csv file
     def load_labels(self):
         with open(self.labels_path) as file:
             self.labels = list(csv.reader(file, delimiter=','))[0]
 
-    # Load custom seaborn color palette from *.csv file
+    # Loads a custom seaborn color palette from a *.csv file
     def load_palette(self):
         with open(self.palette_path) as file:
             self.palette = list(csv.reader(file, delimiter=','))[0]
 
-    # Initialize other class attributes
+    # Initializes other class attributes
     def __post_init__(self):
         self.load_image()
         self.load_gt()
