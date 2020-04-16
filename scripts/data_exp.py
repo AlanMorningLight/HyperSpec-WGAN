@@ -51,7 +51,7 @@ class DataExploration(HyperspectralScene):
         figure, axes = plt.subplots(constrained_layout=True)
         return figure, axes
 
-    # Add a discrete colorbar with labels to a plot
+    # Adds a discrete colorbar with labels to a plot
     def __plot_colorbar(self, figure, axes):
         colormap = ListedColormap(self.palette)
         colorbar = figure.colorbar(mappable=ScalarMappable(cmap=colormap),
@@ -70,7 +70,7 @@ class DataExploration(HyperspectralScene):
         colorbar.outline.set_visible(False)
         colorbar.ax.invert_yaxis()
 
-    # Plot PCA results
+    # Plots PCA results
     def plot_PCA(self, plot_path):
         figure, axes = self.__plot_parameters()
         plot = sb.scatterplot(x=self.X_PCA[:, 0],
@@ -93,7 +93,7 @@ class DataExploration(HyperspectralScene):
         figure.savefig(plot_path, format='svg')
         plt.close(fig=figure)
 
-    # Plot t-SNE results
+    # Plots t-SNE results
     def plot_TSNE(self, plot_path):
         figure, axes = self.__plot_parameters()
         plot = sb.scatterplot(x=self.X_TSNE[:, 0],
