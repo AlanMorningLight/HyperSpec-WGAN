@@ -41,7 +41,7 @@ class Train3DCNN(HyperspectralScene):
         self.X_scale = model_scale.fit_transform(X=self.X)
 
     # Fits a PCA model to the data
-    def fit_PCA(self, n_components=0.98):
+    def fit_PCA(self, n_components=15):
         model_PCA = PCA(n_components=n_components, whiten=True)
         self.X_PCA = model_PCA.fit_transform(X=self.X_scale)
 
@@ -51,9 +51,9 @@ class Train3DCNN(HyperspectralScene):
                                                self.image.shape[1],
                                                self.X_PCA.shape[1]))
         side = X.shape[2]
-        pad = int(side / 2)
+        pad = int((side - 1) / 2)
         X_pad = np.pad(array=X, pad_width=((pad,), (pad,), (0,)))
-        X_split = view_as_windows(arr_in=X_pad[1:, 1:, :],
+        X_split = view_as_windows(arr_in=X_pad,
                                   window_shape=(side, side, side))
         X_all = np.reshape(a=X_split, newshape=(X.shape[0] * X.shape[1],
                                                 side,
@@ -84,20 +84,13 @@ class Train3DCNN(HyperspectralScene):
     # Designs a 3D-CNN model
     def design_CNN_3D(self):
         input_layer = Input(shape=self.X_train.shape[1:])
-        x = Conv3D(filters=8,
+        x = Conv3D(filters=32,
                    kernel_size=(3, 3, 11),
-                   padding='valid',
-                   bias_constraint=unit_norm())(input_layer)
-        x = LeakyReLU()(x)
-        x = Conv3D(filters=16,
-                   kernel_size=(3, 3, 7),
-                   padding='valid',
                    bias_constraint=unit_norm())(input_layer)
         x = LeakyReLU()(x)
         x = Conv3D(filters=32,
-                   kernel_size=(3, 3, 3),
-                   padding='valid',
-                   bias_constraint=unit_norm())(input_layer)
+                   kernel_size=(3, 3, 5),
+                   bias_constraint=unit_norm())(x)
         x = LeakyReLU()(x)
         x = Flatten()(x)
         x = Dense(units=256, activation='relu')(x)
