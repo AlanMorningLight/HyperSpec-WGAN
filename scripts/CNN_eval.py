@@ -10,7 +10,6 @@ from matplotlib import pyplot as plt
 from matplotlib.gridspec import GridSpec
 from pandas import DataFrame
 from sklearn.metrics import classification_report, confusion_matrix
-from tensorflow.keras import Model, models
 
 from scene import HyperspectralScene
 
@@ -21,35 +20,24 @@ class EvaluateCNN(HyperspectralScene):
     accuracy: DataFrame
     loss: DataFrame
     network: str
-    model: Model
-    X_all: np.ndarray
-    X_test: np.ndarray
     y_test: np.ndarray
     y_pred: np.ndarray
     y_test_pred: np.ndarray
 
-    # Loads a CNN model and it's training history from *.hdf5 files
-    def load_model(self, network, model_path, acc_path, loss_path):
+    # Loads a CNN model and its training history from *.hdf5 files
+    def load_model(self, network, acc_path, loss_path):
         self.network = network
-        self.model = models.load_model(filepath=model_path)
         self.accuracy = pd.read_hdf(path_or_buf=acc_path)
         self.loss = pd.read_hdf(path_or_buf=loss_path)
 
-    # Loads testing data from *.hdf5 file
-    def load_data(self, X_all_path, X_test_path, y_test_path):
-        with File(name=X_all_path, mode='r') as file:
-            self.X_all = file['X_all'][:]
-        with File(name=X_test_path, mode='r') as file:
-            self.X_test = file['X_test'][:]
+    # Loads testing data from *.hdf5 files
+    def load_data(self, y_test_path, y_pred_path, y_test_pred_path):
         with File(name=y_test_path, mode='r') as file:
             self.y_test = file['y_test'][:]
-
-    # Predict testing data
-    def predict_data(self):
-        y_pred = self.model.predict(self.X_all)
-        y_test_pred = self.model.predict(self.X_test)
-        self.y_pred = np.argmax(a=y_pred, axis=1)
-        self.y_test_pred = np.argmax(a=y_test_pred, axis=1)
+        with File(name=y_pred_path, mode='r') as file:
+            self.y_pred = file['y_pred'][:]
+        with File(name=y_test_pred_path, mode='r') as file:
+            self.y_test_pred = file['y_test_pred'][:]
 
     # Generates classification report in LaTeX format
     def generate_report(self, report_path):

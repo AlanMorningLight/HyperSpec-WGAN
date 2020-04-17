@@ -7,7 +7,7 @@ from pandas import DataFrame
 from sklearn.decomposition import PCA
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
-from tensorflow.keras import Input, Model
+from tensorflow.keras import Input, Model, models
 from tensorflow.keras.callbacks import History, ModelCheckpoint
 from tensorflow.keras.constraints import unit_norm
 from tensorflow.keras.layers import Conv1D, Dense, Dropout, Flatten, LeakyReLU
@@ -17,7 +17,7 @@ from tensorflow.keras.utils import to_categorical
 from scene import HyperspectralScene
 
 
-# Data class for 1D-CNNs
+# Data class for a 3D-CNN
 @dataclass(init=False)
 class Train1DCNN(HyperspectralScene):
     X_scale: np.ndarray
@@ -29,6 +29,8 @@ class Train1DCNN(HyperspectralScene):
     y_train: np.ndarray
     y_test: np.ndarray
     y_valid: np.ndarray
+    y_pred: np.ndarray
+    y_test_pred: np.ndarray
     model: Model
     history: History
 
@@ -106,7 +108,21 @@ class Train1DCNN(HyperspectralScene):
                                       validation_data=(self.X_valid,
                                                        self.y_valid))
 
-    # Saves model training history and testing data
+    # Predicts data using the best model and saves testing data
+    def predict_data(self, model_path, data_dir):
+        self.model = models.load_model(filepath=model_path)
+        y_pred = self.model.predict(self.X_all)
+        y_test_pred = self.model.predict(self.X_test)
+        self.y_pred = np.argmax(a=y_pred, axis=1)
+        self.y_test_pred = np.argmax(a=y_test_pred, axis=1)
+        with File(name=f"{data_dir}/y_test.hdf5", mode='w') as file:
+            file.create_dataset(name='y_test', data=self.y_test)
+        with File(name=f"{data_dir}/y_pred.hdf5", mode='w') as file:
+            file.create_dataset(name='y_pred', data=self.y_pred)
+        with File(name=f"{data_dir}/y_test_pred.hdf5", mode='w') as file:
+            file.create_dataset(name='y_test_pred', data=self.y_test_pred)
+
+    # Saves model training history
     def save_history(self, history_dir):
         accuracy = {'Training': self.history.history['accuracy'],
                     'Validation': self.history.history['val_accuracy']}
@@ -120,9 +136,3 @@ class Train1DCNN(HyperspectralScene):
                          path_or_buf=f"{history_dir}/loss.hdf5",
                          key='history',
                          mode='w')
-        with File(name=f"{history_dir}/X_all.hdf5", mode='w') as file:
-            file.create_dataset(name='X_all', data=self.X_all)
-        with File(name=f"{history_dir}/X_test.hdf5", mode='w') as file:
-            file.create_dataset(name='X_test', data=self.X_test)
-        with File(name=f"{history_dir}/y_test.hdf5", mode='w') as file:
-            file.create_dataset(name='y_test', data=self.y_test)
