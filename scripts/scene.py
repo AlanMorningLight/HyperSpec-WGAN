@@ -14,6 +14,7 @@ class HyperspectralScene:
     gt_path: str
     labels_path: str
     palette_path: str
+    remove_unlabeled: bool
     image: np.ndarray = field(init=False)
     gt: np.ndarray = field(init=False)
     labels: list = field(init=False)
@@ -21,29 +22,36 @@ class HyperspectralScene:
     X: np.ndarray = field(init=False)
     y: np.ndarray = field(init=False)
 
-    # Loads a hyperspectral image from a *.mat file
+    # Load a hyperspectral image from a *.mat file
     def load_image(self):
         self.image = list(loadmat(file_name=self.image_path).values())[-1]
         self.X = np.reshape(a=self.image, newshape=(-1, self.image.shape[2]))
 
-    # Loads the ground truth from a *.mat file
+    # Load a ground truth from a *.mat file
     def load_gt(self):
         self.gt = list(loadmat(file_name=self.gt_path).values())[-1]
         self.y = np.reshape(a=self.gt, newshape=-1)
 
-    # Loads class labels from a *.csv file
+    # Load class labels from a *.csv file
     def load_labels(self):
         with open(self.labels_path) as file:
             self.labels = list(csv.reader(file, delimiter=','))[0]
 
-    # Loads a custom seaborn color palette from a *.csv file
+    # Load a custom color palette from a *.csv file
     def load_palette(self):
         with open(self.palette_path) as file:
             self.palette = list(csv.reader(file, delimiter=','))[0]
 
-    # Initializes other class attributes
+    # Remove unlabeled data from labels and color palette
+    def check_remove_unlabeled(self):
+        if self.remove_unlabeled:
+            self.labels = self.labels[1:]
+            self.palette[0] = '#000000'
+
+    # Initialize other class attributes
     def __post_init__(self):
         self.load_image()
         self.load_gt()
         self.load_labels()
         self.load_palette()
+        self.check_remove_unlabeled()

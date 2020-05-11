@@ -34,20 +34,25 @@ class Train1DCNN(HyperspectralScene):
     model: Model
     history: History
 
-    # Scales each feature to a given range
-    def fit_scaler(self):
-        model_scale = MinMaxScaler(feature_range=(-1, 1))
+    # Remove unlabeled data from X and y
+    def check_remove_unlabeled(self):
+        if self.remove_unlabeled:
+            self.X = self.X[self.y != 0, :]
+            self.y = self.y[self.y != 0] - 1
+
+    # Scale each feature to a given range
+    def fit_scaler(self, feature_range):
+        model_scale = MinMaxScaler(feature_range=feature_range)
         self.X_scale = model_scale.fit_transform(X=self.X)
 
-    # Fits a PCA model to the data
-    def fit_PCA(self, n_components=0.98):
-        model_PCA = PCA(n_components=n_components, whiten=True)
+    # Fit a PCA model
+    def fit_PCA(self, n_components, whiten):
+        model_PCA = PCA(n_components=n_components, whiten=whiten)
         self.X_PCA = model_PCA.fit_transform(X=self.X_scale)
 
-    # Splits data into 60% training, 20% testing, 20% validation for 1D-CNN
+    # Split data into 60% training, 20% testing, and 20% validation
     def prepare_data(self):
-        X_all = self.X_PCA
-        X_train, X_test, y_train, y_test = train_test_split(X_all,
+        X_train, X_test, y_train, y_test = train_test_split(self.X_PCA,
                                                             self.y,
                                                             test_size=0.4,
                                                             random_state=42,
@@ -57,7 +62,7 @@ class Train1DCNN(HyperspectralScene):
                                                             test_size=0.5,
                                                             random_state=42,
                                                             stratify=y_test)
-        self.X_all = np.reshape(a=X_all,
+        self.X_all = np.reshape(a=self.X_PCA,
                                 newshape=(-1, self.X_PCA.shape[1], 1))
         self.X_train = np.reshape(a=X_train,
                                   newshape=(-1, self.X_PCA.shape[1], 1))
@@ -69,7 +74,7 @@ class Train1DCNN(HyperspectralScene):
         self.y_test = y_test
         self.y_valid = to_categorical(y=y_valid)
 
-    # Designs a 1D-CNN model
+    # Design a 1D-CNN model
     def design_CNN_1D(self):
         input_layer = Input(shape=self.X_train.shape[1:])
         x = Conv1D(filters=32,
@@ -84,19 +89,19 @@ class Train1DCNN(HyperspectralScene):
         x = LeakyReLU()(x)
         x = Flatten()(x)
         x = Dense(units=256, activation='relu')(x)
-        x = Dropout(rate=0.5)(x)
+        x = Dropout(rate=0.4)(x)
         x = Dense(units=128, activation='relu')(x)
-        x = Dropout(rate=0.5)(x)
+        x = Dropout(rate=0.4)(x)
         output_layer = Dense(units=len(self.labels), activation='softmax')(x)
         self.model = Model(inputs=input_layer, outputs=output_layer)
 
-    # Fits a 1D-CNN model to the data
+    # Fit a 1D-CNN model and save the best model
     def fit_CNN_1D(self, model_dir):
         self.model.compile(optimizer=Adam(learning_rate=0.001),
                            loss='categorical_crossentropy',
                            metrics=['accuracy'])
         checkpoint = ModelCheckpoint(filepath=f"{model_dir}/model.hdf5",
-                                     monitor='val_accuracy',
+                                     monitor='val_loss',
                                      verbose=1,
                                      save_best_only=True)
         self.history = self.model.fit(x=self.X_train,
@@ -108,7 +113,7 @@ class Train1DCNN(HyperspectralScene):
                                       validation_data=(self.X_valid,
                                                        self.y_valid))
 
-    # Predicts data using the best model and saves testing data
+    # Predict data using the best model and save testing data and predictions
     def predict_data(self, model_path, data_dir):
         self.model = models.load_model(filepath=model_path)
         y_pred = self.model.predict(self.X_all)
@@ -122,7 +127,7 @@ class Train1DCNN(HyperspectralScene):
         with File(name=f"{data_dir}/y_test_pred.hdf5", mode='w') as file:
             file.create_dataset(name='y_test_pred', data=self.y_test_pred)
 
-    # Saves model training history
+    # Save model training history
     def save_history(self, history_dir):
         accuracy = {'Training': self.history.history['accuracy'],
                     'Validation': self.history.history['val_accuracy']}
@@ -136,3 +141,7 @@ class Train1DCNN(HyperspectralScene):
                          path_or_buf=f"{history_dir}/loss.hdf5",
                          key='history',
                          mode='w')
+
+    # Initialize other class attributes
+    def __post_init__(self):
+        self.check_remove_unlabeled()
