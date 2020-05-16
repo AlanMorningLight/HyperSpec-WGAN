@@ -8,8 +8,8 @@ from skimage.util.shape import view_as_windows
 from sklearn.decomposition import PCA
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
-from tensorflow.keras import Input, Model, models
-from tensorflow.keras.callbacks import History, ModelCheckpoint
+from tensorflow.keras import Input, Model
+from tensorflow.keras.callbacks import History, ModelCheckpoint, CSVLogger
 from tensorflow.keras.constraints import unit_norm
 from tensorflow.keras.layers import Conv3D, Dense, Dropout, Flatten, LeakyReLU
 from tensorflow.keras.optimizers import Adam
@@ -21,7 +21,6 @@ from scene import HyperspectralScene
 # Data class for a 3D-CNN
 @dataclass(init=False)
 class Train3DCNN(HyperspectralScene):
-    X_temp: np.ndarray
     y_temp: np.ndarray
     X_scale: np.ndarray
     X_PCA: np.ndarray
@@ -40,7 +39,6 @@ class Train3DCNN(HyperspectralScene):
     # Remove unlabeled data from X and y
     def check_remove_unlabeled(self):
         if self.remove_unlabeled:
-            self.X_temp = self.X
             self.y_temp = self.y
             self.X = self.X[self.y != 0, :]
             self.y = self.y[self.y != 0] - 1
@@ -54,26 +52,24 @@ class Train3DCNN(HyperspectralScene):
     def fit_PCA(self, n_components, whiten):
         model_PCA = PCA(n_components=n_components, whiten=whiten)
         self.X_PCA = model_PCA.fit_transform(X=self.X_scale)
+        self.bands = self.X_PCA.shape[1]
+        if self.remove_unlabeled:
+            temp = np.zeros(shape=(len(self.y_temp), self.bands))
+            temp[self.y_temp != 0, :] = self.X_PCA
+            self.X_PCA = temp
 
     # Split data into 60% training, 20% testing, and 20% validation
     def prepare_data(self):
-        if self.remove_unlabeled:
-            X_temp = np.zeros(shape=(self.X_temp.shape[0],
-                                     self.X_PCA.shape[1]))
-            X_temp[self.y_temp != 0, :] = self.X_PCA
-            self.X_PCA = X_temp
-        X = np.reshape(a=self.X_PCA, newshape=(self.image.shape[0],
-                                               self.image.shape[1],
-                                               self.X_PCA.shape[1]))
-        side = X.shape[2]
+        X = np.reshape(a=self.X_PCA,
+                       newshape=(self.image.shape[0],
+                                 self.image.shape[1],
+                                 self.bands))
+        side = self.bands
         pad = int((side - 1) / 2)
         X_pad = np.pad(array=X, pad_width=((pad,), (pad,), (0,)))
         X_split = view_as_windows(arr_in=X_pad,
                                   window_shape=(side, side, side))
-        X_all = np.reshape(a=X_split, newshape=(X.shape[0] * X.shape[1],
-                                                side,
-                                                side,
-                                                side))
+        X_all = np.reshape(a=X_split, newshape=(-1, side, side, side))
         if self.remove_unlabeled:
             X_all = X_all[self.y_temp != 0, :, :, :]
         X_train, X_test, y_train, y_test = train_test_split(X_all,
@@ -100,10 +96,10 @@ class Train3DCNN(HyperspectralScene):
 
     # Design a 3D-CNN model
     def design_CNN_3D(self):
-        input_layer = Input(shape=self.X_train.shape[1:])
+        inputs = Input(shape=self.X_train.shape[1:])
         x = Conv3D(filters=32,
                    kernel_size=(3, 3, 11),
-                   bias_constraint=unit_norm())(input_layer)
+                   bias_constraint=unit_norm())(inputs)
         x = LeakyReLU()(x)
         x = Conv3D(filters=32,
                    kernel_size=(3, 3, 5),
@@ -114,34 +110,40 @@ class Train3DCNN(HyperspectralScene):
         x = Dropout(rate=0.4)(x)
         x = Dense(units=128, activation='relu')(x)
         x = Dropout(rate=0.4)(x)
-        output_layer = Dense(units=len(self.labels), activation='softmax')(x)
-        self.model = Model(inputs=input_layer, outputs=output_layer)
+        outputs = Dense(units=len(self.labels), activation='softmax')(x)
+        self.model = Model(inputs=inputs, outputs=outputs)
 
     # Fit a 3D-CNN model and save the best model
     def fit_CNN_3D(self, model_dir):
         self.model.compile(optimizer=Adam(learning_rate=0.001),
                            loss='categorical_crossentropy',
                            metrics=['accuracy'])
-        checkpoint = ModelCheckpoint(filepath=f"{model_dir}/model.hdf5",
-                                     monitor='val_loss',
-                                     verbose=1,
-                                     save_best_only=True)
+        best_weights = ModelCheckpoint(filepath=f"{model_dir}/weights.hdf5",
+                                       monitor='val_loss',
+                                       verbose=2,
+                                       save_best_only=True,
+                                       save_weights_only=True)
+        log = CSVLogger(filename=f"{model_dir}/history.hdf5")
         self.history = self.model.fit(x=self.X_train,
                                       y=self.y_train,
                                       batch_size=256,
                                       epochs=200,
                                       verbose=2,
-                                      callbacks=[checkpoint],
+                                      callbacks=[best_weights, log],
                                       validation_data=(self.X_valid,
                                                        self.y_valid))
 
     # Predict data using the best model and save testing data and predictions
-    def predict_data(self, model_path, data_dir):
-        self.model = models.load_model(filepath=model_path)
+    def predict_data(self, weights_path, data_dir):
+        self.model.load_weights(filepath=weights_path)
         y_pred = self.model.predict(self.X_all)
         y_test_pred = self.model.predict(self.X_test)
         self.y_pred = np.argmax(a=y_pred, axis=1)
         self.y_test_pred = np.argmax(a=y_test_pred, axis=1)
+        if self.remove_unlabeled:
+            self.y_test += 1
+            self.y_pred += 1
+            self.y_test_pred += 1
         with File(name=f"{data_dir}/y_test.hdf5", mode='w') as file:
             file.create_dataset(name='y_test', data=self.y_test)
         with File(name=f"{data_dir}/y_pred.hdf5", mode='w') as file:

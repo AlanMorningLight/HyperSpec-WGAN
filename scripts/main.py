@@ -18,7 +18,7 @@ if os.path.basename(os.getcwd()) == 'scripts':
 # Initialize Indian Pines without unlabeled data
 ip = HyperspectralScene(name='Indian Pines',
                         image_path="indian-pines/data/image.mat",
-                        gt_path="indian-pines/data/ground-truth.mat",
+                        ground_truth_path="indian-pines/data/ground-truth.mat",
                         labels_path="indian-pines/data/labels.csv",
                         palette_path="indian-pines/data/plot-palette.csv",
                         remove_unlabeled=True)
@@ -28,7 +28,7 @@ ip = HyperspectralScene(name='Indian Pines',
 ip_DE = copy(ip)
 ip_DE.__class__ = DataExploration
 ip_DE.__post_init__()
-ip_DE.plot_gt(
+ip_DE.plot_ground_truth(
     plot_path="indian-pines/plots/without-unlabeled/ground-truth-map.svg")
 ip_DE.fit_scaler(feature_range=(-1, 1))
 ip_DE.fit_PCA(n_components=15, whiten=True)
@@ -52,7 +52,7 @@ ip_CNN_1D.prepare_data()
 ip_CNN_1D.design_CNN_1D()
 ip_CNN_1D.fit_CNN_1D(model_dir="indian-pines/model/without-unlabeled/CNN-1D")
 ip_CNN_1D.predict_data(
-    model_path="indian-pines/model/without-unlabeled/CNN-1D/model.hdf5",
+    weights_path="indian-pines/model/without-unlabeled/CNN-1D/weights.hdf5",
     data_dir="indian-pines/model/without-unlabeled/CNN-1D")
 ip_CNN_1D.save_history(
     history_dir="indian-pines/model/without-unlabeled/CNN-1D")
@@ -69,7 +69,7 @@ ip_CNN_3D.design_CNN_3D()
 ip_CNN_3D.fit_CNN_3D(
     model_dir="indian-pines/model/without-unlabeled/CNN-3D")
 ip_CNN_3D.predict_data(
-    model_path="indian-pines/model/without-unlabeled/CNN-3D/model.hdf5",
+    weights_path="indian-pines/model/without-unlabeled/CNN-3D/weights.hdf5",
     data_dir="indian-pines/model/without-unlabeled/CNN-3D")
 ip_CNN_3D.save_history(
     history_dir="indian-pines/model/without-unlabeled/CNN-3D")
@@ -130,7 +130,7 @@ ip_CNN_3D_eval.plot_pred(
 # Initialize Indian Pines with unlabeled data
 ip = HyperspectralScene(name='Indian Pines',
                         image_path="indian-pines/data/image.mat",
-                        gt_path="indian-pines/data/ground-truth.mat",
+                        ground_truth_path="indian-pines/data/ground-truth.mat",
                         labels_path="indian-pines/data/labels.csv",
                         palette_path="indian-pines/data/plot-palette.csv",
                         remove_unlabeled=False)
@@ -140,7 +140,7 @@ ip = HyperspectralScene(name='Indian Pines',
 ip_DE = copy(ip)
 ip_DE.__class__ = DataExploration
 ip_DE.__post_init__()
-ip_DE.plot_gt(
+ip_DE.plot_ground_truth(
     plot_path="indian-pines/plots/with-unlabeled/ground-truth-map.svg")
 ip_DE.fit_scaler(feature_range=(-1, 1))
 ip_DE.fit_PCA(n_components=15, whiten=True)
@@ -164,7 +164,7 @@ ip_CNN_1D.prepare_data()
 ip_CNN_1D.design_CNN_1D()
 ip_CNN_1D.fit_CNN_1D(model_dir="indian-pines/model/with-unlabeled/CNN-1D")
 ip_CNN_1D.predict_data(
-    model_path="indian-pines/model/with-unlabeled/CNN-1D/model.hdf5",
+    weights_path="indian-pines/model/with-unlabeled/CNN-1D/weights.hdf5",
     data_dir="indian-pines/model/with-unlabeled/CNN-1D")
 ip_CNN_1D.save_history(
     history_dir="indian-pines/model/with-unlabeled/CNN-1D")
@@ -181,7 +181,7 @@ ip_CNN_3D.design_CNN_3D()
 ip_CNN_3D.fit_CNN_3D(
     model_dir="indian-pines/model/with-unlabeled/CNN-3D")
 ip_CNN_3D.predict_data(
-    model_path="indian-pines/model/with-unlabeled/CNN-3D/model.hdf5",
+    weights_path="indian-pines/model/with-unlabeled/CNN-3D/weights.hdf5",
     data_dir="indian-pines/model/with-unlabeled/CNN-3D")
 ip_CNN_3D.save_history(
     history_dir="indian-pines/model/with-unlabeled/CNN-3D")

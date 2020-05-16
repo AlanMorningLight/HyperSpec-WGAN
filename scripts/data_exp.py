@@ -37,6 +37,7 @@ class DataExploration(HyperspectralScene):
     def fit_PCA(self, n_components, whiten):
         self.model_PCA = PCA(n_components=n_components, whiten=whiten)
         self.X_PCA = self.model_PCA.fit_transform(X=self.X_scale)
+        self.bands = self.X_PCA.shape[1]
 
     # Fit a t-SNE model to the data
     def fit_TSNE(self, perplexity, early_exaggeration, learning_rate, n_iter):
@@ -59,11 +60,8 @@ class DataExploration(HyperspectralScene):
         return figure, axes, palette
 
     # Plot a discrete colorbar
-    def __plot_colorbar(self, figure, axes):
-        if self.remove_unlabeled:
-            colormap = ListedColormap(self.palette[1:])
-        else:
-            colormap = ListedColormap(self.palette)
+    def __plot_colorbar(self, figure, axes, palette):
+        colormap = ListedColormap(colors=palette)
         colorbar = figure.colorbar(mappable=ScalarMappable(cmap=colormap),
                                    ax=axes)
         colorbar_range = colorbar.vmax - colorbar.vmin
@@ -99,7 +97,7 @@ class DataExploration(HyperspectralScene):
                          f'Explained Variance'),
                  ylabel=(f'Principal Component 2 - {PC2:.1f}% '
                          f'Explained Variance'))
-        self.__plot_colorbar(figure=figure, axes=axes)
+        self.__plot_colorbar(figure=figure, axes=axes, palette=palette)
         figure.savefig(plot_path, format='svg')
         plt.close(fig=figure)
 
@@ -118,22 +116,23 @@ class DataExploration(HyperspectralScene):
         plot.set(title=f'{self.name} t-SNE Projection',
                  xlabel='t-SNE Component 1',
                  ylabel='t-SNE Component 2')
-        self.__plot_colorbar(figure=figure, axes=axes)
+        self.__plot_colorbar(figure=figure, axes=axes, palette=palette)
         figure.savefig(plot_path, format='svg')
         plt.close(fig=figure)
 
     # Plot ground truth classification map
-    def plot_gt(self, plot_path):
-        figure, axes, _ = self.__plot_parameters()
-        gt_plot = sb.heatmap(data=self.gt,
-                             cmap=self.palette,
-                             cbar=False,
-                             square=True,
-                             xticklabels=False,
-                             yticklabels=False,
-                             ax=axes)
-        gt_plot.set(title=f'{self.name} Ground Truth Classification Map')
-        self.__plot_colorbar(figure=figure, axes=axes)
+    def plot_ground_truth(self, plot_path):
+        figure, axes, palette = self.__plot_parameters()
+        ground_truth_plot = sb.heatmap(data=self.ground_truth,
+                                       cmap=self.palette,
+                                       cbar=False,
+                                       square=True,
+                                       xticklabels=False,
+                                       yticklabels=False,
+                                       ax=axes)
+        ground_truth_plot.set(title=(f'{self.name} Ground Truth '
+                                     f'Classification Map'))
+        self.__plot_colorbar(figure=figure, axes=axes, palette=palette)
         figure.savefig(plot_path, format='svg')
         plt.close(fig=figure)
 

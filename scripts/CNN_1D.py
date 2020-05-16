@@ -7,8 +7,8 @@ from pandas import DataFrame
 from sklearn.decomposition import PCA
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
-from tensorflow.keras import Input, Model, models
-from tensorflow.keras.callbacks import History, ModelCheckpoint
+from tensorflow.keras import Input, Model
+from tensorflow.keras.callbacks import History, ModelCheckpoint, CSVLogger
 from tensorflow.keras.constraints import unit_norm
 from tensorflow.keras.layers import Conv1D, Dense, Dropout, Flatten, LeakyReLU
 from tensorflow.keras.optimizers import Adam
@@ -49,6 +49,7 @@ class Train1DCNN(HyperspectralScene):
     def fit_PCA(self, n_components, whiten):
         model_PCA = PCA(n_components=n_components, whiten=whiten)
         self.X_PCA = model_PCA.fit_transform(X=self.X_scale)
+        self.bands = self.X_PCA.shape[1]
 
     # Split data into 60% training, 20% testing, and 20% validation
     def prepare_data(self):
@@ -62,25 +63,21 @@ class Train1DCNN(HyperspectralScene):
                                                             test_size=0.5,
                                                             random_state=42,
                                                             stratify=y_test)
-        self.X_all = np.reshape(a=self.X_PCA,
-                                newshape=(-1, self.X_PCA.shape[1], 1))
-        self.X_train = np.reshape(a=X_train,
-                                  newshape=(-1, self.X_PCA.shape[1], 1))
-        self.X_test = np.reshape(a=X_test,
-                                 newshape=(-1, self.X_PCA.shape[1], 1))
-        self.X_valid = np.reshape(a=X_valid,
-                                  newshape=(-1, self.X_PCA.shape[1], 1))
+        self.X_all = np.reshape(a=self.X_PCA, newshape=(-1, self.bands, 1))
+        self.X_train = np.reshape(a=X_train, newshape=(-1, self.bands, 1))
+        self.X_test = np.reshape(a=X_test, newshape=(-1, self.bands, 1))
+        self.X_valid = np.reshape(a=X_valid, newshape=(-1, self.bands, 1))
         self.y_train = to_categorical(y=y_train)
         self.y_test = y_test
         self.y_valid = to_categorical(y=y_valid)
 
     # Design a 1D-CNN model
     def design_CNN_1D(self):
-        input_layer = Input(shape=self.X_train.shape[1:])
+        inputs = Input(shape=self.X_train.shape[1:])
         x = Conv1D(filters=32,
                    kernel_size=11,
                    padding='causal',
-                   bias_constraint=unit_norm())(input_layer)
+                   bias_constraint=unit_norm())(inputs)
         x = LeakyReLU()(x)
         x = Conv1D(filters=32,
                    kernel_size=5,
@@ -92,34 +89,39 @@ class Train1DCNN(HyperspectralScene):
         x = Dropout(rate=0.4)(x)
         x = Dense(units=128, activation='relu')(x)
         x = Dropout(rate=0.4)(x)
-        output_layer = Dense(units=len(self.labels), activation='softmax')(x)
-        self.model = Model(inputs=input_layer, outputs=output_layer)
+        outputs = Dense(units=len(self.labels), activation='softmax')(x)
+        self.model = Model(inputs=inputs, outputs=outputs)
 
     # Fit a 1D-CNN model and save the best model
     def fit_CNN_1D(self, model_dir):
         self.model.compile(optimizer=Adam(learning_rate=0.001),
                            loss='categorical_crossentropy',
                            metrics=['accuracy'])
-        checkpoint = ModelCheckpoint(filepath=f"{model_dir}/model.hdf5",
-                                     monitor='val_loss',
-                                     verbose=1,
-                                     save_best_only=True)
+        best_weights = ModelCheckpoint(filepath=f"{model_dir}/weights.hdf5",
+                                       monitor='val_loss',
+                                       verbose=1,
+                                       save_best_only=True)
+        log = CSVLogger(filename=f"{model_dir}/history.hdf5")
         self.history = self.model.fit(x=self.X_train,
                                       y=self.y_train,
                                       batch_size=256,
                                       epochs=200,
                                       verbose=2,
-                                      callbacks=[checkpoint],
+                                      callbacks=[best_weights, log],
                                       validation_data=(self.X_valid,
                                                        self.y_valid))
 
     # Predict data using the best model and save testing data and predictions
-    def predict_data(self, model_path, data_dir):
-        self.model = models.load_model(filepath=model_path)
+    def predict_data(self, weights_path, data_dir):
+        self.model.load_weights(filepath=weights_path)
         y_pred = self.model.predict(self.X_all)
         y_test_pred = self.model.predict(self.X_test)
         self.y_pred = np.argmax(a=y_pred, axis=1)
         self.y_test_pred = np.argmax(a=y_test_pred, axis=1)
+        if self.remove_unlabeled:
+            self.y_test += 1
+            self.y_pred += 1
+            self.y_test_pred += 1
         with File(name=f"{data_dir}/y_test.hdf5", mode='w') as file:
             file.create_dataset(name='y_test', data=self.y_test)
         with File(name=f"{data_dir}/y_pred.hdf5", mode='w') as file:

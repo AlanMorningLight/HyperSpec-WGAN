@@ -40,10 +40,6 @@ class EvaluateCNN(HyperspectralScene):
             self.y_pred = file['y_pred'][:]
         with File(name=y_test_pred_path, mode='r') as file:
             self.y_test_pred = file['y_test_pred'][:]
-        if self.remove_unlabeled:
-            self.y_test += 1
-            self.y_pred += 1
-            self.y_test_pred += 1
 
     # Generates classification report in LaTeX format
     def generate_report(self, report_path):
@@ -129,21 +125,21 @@ class EvaluateCNN(HyperspectralScene):
             y_temp = np.zeros(shape=len(self.y))
             y_temp[self.y != 0] = self.y_pred
             self.y_pred = y_temp
-        y_pred = np.reshape(a=self.y_pred, newshape=self.gt.shape)
+        y_pred = np.reshape(a=self.y_pred, newshape=self.ground_truth.shape)
         sb.set(context='paper',
                style='white',
                font='serif',
                rc={'figure.figsize': (9, 6.5)})
         figure, axes = plt.subplots(constrained_layout=True)
-        gt_plot = sb.heatmap(data=y_pred,
-                             cmap=self.palette,
-                             cbar=False,
-                             square=True,
-                             xticklabels=False,
-                             yticklabels=False,
-                             ax=axes)
-        gt_plot.set(title=f'{self.name} {self.model} '
-                          f'Predicted Classification Map')
+        ground_truth_plot = sb.heatmap(data=y_pred,
+                                       cmap=self.palette,
+                                       cbar=False,
+                                       square=True,
+                                       xticklabels=False,
+                                       yticklabels=False,
+                                       ax=axes)
+        ground_truth_plot.set(title=f'{self.name} {self.model} '
+                                    f'Predicted Classification Map')
         if self.remove_unlabeled:
             colormap = ListedColormap(self.palette[1:])
         else:

@@ -11,26 +11,29 @@ from scipy.io import loadmat
 class HyperspectralScene:
     name: str
     image_path: str
-    gt_path: str
+    ground_truth_path: str
     labels_path: str
     palette_path: str
     remove_unlabeled: bool
     image: np.ndarray = field(init=False)
-    gt: np.ndarray = field(init=False)
+    ground_truth: np.ndarray = field(init=False)
     labels: list = field(init=False)
     palette: list = field(init=False)
     X: np.ndarray = field(init=False)
     y: np.ndarray = field(init=False)
+    bands: int = field(init=False)
 
     # Load a hyperspectral image from a *.mat file
     def load_image(self):
         self.image = list(loadmat(file_name=self.image_path).values())[-1]
         self.X = np.reshape(a=self.image, newshape=(-1, self.image.shape[2]))
+        self.bands = self.X.shape[1]
 
     # Load a ground truth from a *.mat file
-    def load_gt(self):
-        self.gt = list(loadmat(file_name=self.gt_path).values())[-1]
-        self.y = np.reshape(a=self.gt, newshape=-1)
+    def load_ground_truth(self):
+        load = loadmat(file_name=self.ground_truth_path).values()
+        self.ground_truth = list(load)[-1]
+        self.y = np.reshape(a=self.ground_truth, newshape=-1)
 
     # Load class labels from a *.csv file
     def load_labels(self):
@@ -51,7 +54,7 @@ class HyperspectralScene:
     # Initialize other class attributes
     def __post_init__(self):
         self.load_image()
-        self.load_gt()
+        self.load_ground_truth()
         self.load_labels()
         self.load_palette()
         self.check_remove_unlabeled()
