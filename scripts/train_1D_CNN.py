@@ -3,23 +3,22 @@ from dataclasses import dataclass
 
 import numpy as np
 from h5py import File
-from pandas import DataFrame
 from sklearn.decomposition import PCA
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras import Input, Model
-from tensorflow.keras.callbacks import History, ModelCheckpoint, CSVLogger
+from tensorflow.keras.callbacks import (CSVLogger, ModelCheckpoint,
+                                        ReduceLROnPlateau)
 from tensorflow.keras.constraints import unit_norm
 from tensorflow.keras.layers import Conv1D, Dense, Dropout, Flatten, LeakyReLU
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.utils import to_categorical
 
-from scene import HyperspectralScene
+from hyperspectral_scene import HyperspectralScene
 
 
-# Data class for a 3D-CNN
+# Data class for a 1D-CNN
 @dataclass(init=False)
 class Train1DCNN(HyperspectralScene):
+    train_1D_CNN_path: str
     X_scale: np.ndarray
     X_PCA: np.ndarray
     X_all: np.ndarray
@@ -29,16 +28,21 @@ class Train1DCNN(HyperspectralScene):
     y_train: np.ndarray
     y_test: np.ndarray
     y_valid: np.ndarray
+    model: Model
     y_pred: np.ndarray
     y_test_pred: np.ndarray
-    model: Model
-    history: History
 
-    # Remove unlabeled data from X and y
-    def check_remove_unlabeled(self):
+    def __post_init__(self):
         if self.remove_unlabeled:
             self.X = self.X[self.y != 0, :]
             self.y = self.y[self.y != 0] - 1
+            self.labels = self.labels[1:]
+            self.samples = self.X.shape[0]
+            self.train_1D_CNN_path = (f"{self.path}/model/"
+                                      f"without-unlabeled/"
+                                      f"1D-CNN")
+        else:
+            self.train_1D_CNN_path = f"{self.path}/model/with-unlabeled/1D-CNN"
 
     # Scale each feature to a given range
     def fit_scaler(self, feature_range):
@@ -49,9 +53,9 @@ class Train1DCNN(HyperspectralScene):
     def fit_PCA(self, n_components, whiten):
         model_PCA = PCA(n_components=n_components, whiten=whiten)
         self.X_PCA = model_PCA.fit_transform(X=self.X_scale)
-        self.bands = self.X_PCA.shape[1]
+        self.features = self.X_PCA.shape[1]
 
-    # Split data into 60% training, 20% testing, and 20% validation
+    # Split the data into 60% training, 20% testing, and 20% validation
     def prepare_data(self):
         X_train, X_test, y_train, y_test = train_test_split(self.X_PCA,
                                                             self.y,
@@ -63,27 +67,27 @@ class Train1DCNN(HyperspectralScene):
                                                             test_size=0.5,
                                                             random_state=42,
                                                             stratify=y_test)
-        self.X_all = np.reshape(a=self.X_PCA, newshape=(-1, self.bands, 1))
-        self.X_train = np.reshape(a=X_train, newshape=(-1, self.bands, 1))
-        self.X_test = np.reshape(a=X_test, newshape=(-1, self.bands, 1))
-        self.X_valid = np.reshape(a=X_valid, newshape=(-1, self.bands, 1))
-        self.y_train = to_categorical(y=y_train)
+        self.X_all = np.reshape(a=self.X_PCA, newshape=(-1, self.features, 1))
+        self.X_train = np.reshape(a=X_train, newshape=(-1, self.features, 1))
+        self.X_test = np.reshape(a=X_test, newshape=(-1, self.features, 1))
+        self.X_valid = np.reshape(a=X_valid, newshape=(-1, self.features, 1))
+        self.y_train = y_train
         self.y_test = y_test
-        self.y_valid = to_categorical(y=y_valid)
+        self.y_valid = y_valid
 
-    # Design a 1D-CNN model
-    def design_CNN_1D(self):
+    # Compile a 1D-CNN model
+    def compile_1D_CNN(self):
         inputs = Input(shape=self.X_train.shape[1:])
         x = Conv1D(filters=32,
                    kernel_size=11,
                    padding='causal',
                    bias_constraint=unit_norm())(inputs)
-        x = LeakyReLU()(x)
+        x = LeakyReLU(alpha=0.2)(x)
         x = Conv1D(filters=32,
                    kernel_size=5,
                    padding='causal',
                    bias_constraint=unit_norm())(x)
-        x = LeakyReLU()(x)
+        x = LeakyReLU(alpha=0.2)(x)
         x = Flatten()(x)
         x = Dense(units=256, activation='relu')(x)
         x = Dropout(rate=0.4)(x)
@@ -91,29 +95,34 @@ class Train1DCNN(HyperspectralScene):
         x = Dropout(rate=0.4)(x)
         outputs = Dense(units=len(self.labels), activation='softmax')(x)
         self.model = Model(inputs=inputs, outputs=outputs)
-
-    # Fit a 1D-CNN model and save the best model
-    def fit_CNN_1D(self, model_dir):
-        self.model.compile(optimizer=Adam(learning_rate=0.001),
-                           loss='categorical_crossentropy',
+        self.model.compile(optimizer='Adam',
+                           loss='sparse_categorical_crossentropy',
                            metrics=['accuracy'])
-        best_weights = ModelCheckpoint(filepath=f"{model_dir}/weights.hdf5",
-                                       monitor='val_loss',
-                                       verbose=1,
-                                       save_best_only=True)
-        log = CSVLogger(filename=f"{model_dir}/history.hdf5")
-        self.history = self.model.fit(x=self.X_train,
-                                      y=self.y_train,
-                                      batch_size=256,
-                                      epochs=200,
-                                      verbose=2,
-                                      callbacks=[best_weights, log],
-                                      validation_data=(self.X_valid,
-                                                       self.y_valid))
 
-    # Predict data using the best model and save testing data and predictions
-    def predict_data(self, weights_path, data_dir):
-        self.model.load_weights(filepath=weights_path)
+    # Fit the 1D-CNN model
+    def fit_1D_CNN(self):
+        best_weights = ModelCheckpoint(filepath=(f"{self.train_1D_CNN_path}/"
+                                                 f"best-weights.hdf5"),
+                                       verbose=2,
+                                       save_best_only=True,
+                                       save_weights_only=True)
+        log = CSVLogger(filename=f"{self.train_1D_CNN_path}/history.csv")
+        reduce_LR = ReduceLROnPlateau(factor=0.5,
+                                      verbose=2,
+                                      min_delta=1e-6,
+                                      min_lr=1e-6)
+        self.model.fit(x=self.X_train,
+                       y=self.y_train,
+                       batch_size=256,
+                       epochs=200,
+                       verbose=2,
+                       callbacks=[best_weights, log, reduce_LR],
+                       validation_data=(self.X_valid, self.y_valid))
+
+    # Predict data using the 1D-CNN model with the best model weights
+    def predict_data(self):
+        self.model.load_weights(filepath=(f"{self.train_1D_CNN_path}/"
+                                          f"best-weights.hdf5"))
         y_pred = self.model.predict(self.X_all)
         y_test_pred = self.model.predict(self.X_test)
         self.y_pred = np.argmax(a=y_pred, axis=1)
@@ -122,28 +131,12 @@ class Train1DCNN(HyperspectralScene):
             self.y_test += 1
             self.y_pred += 1
             self.y_test_pred += 1
-        with File(name=f"{data_dir}/y_test.hdf5", mode='w') as file:
+        with File(name=f"{self.train_1D_CNN_path}/y_test.hdf5",
+                  mode='w') as file:
             file.create_dataset(name='y_test', data=self.y_test)
-        with File(name=f"{data_dir}/y_pred.hdf5", mode='w') as file:
+        with File(name=f"{self.train_1D_CNN_path}/y_pred.hdf5",
+                  mode='w') as file:
             file.create_dataset(name='y_pred', data=self.y_pred)
-        with File(name=f"{data_dir}/y_test_pred.hdf5", mode='w') as file:
+        with File(name=f"{self.train_1D_CNN_path}/y_test_pred.hdf5",
+                  mode='w') as file:
             file.create_dataset(name='y_test_pred', data=self.y_test_pred)
-
-    # Save model training history
-    def save_history(self, history_dir):
-        accuracy = {'Training': self.history.history['accuracy'],
-                    'Validation': self.history.history['val_accuracy']}
-        loss = {'Training': self.history.history['loss'],
-                'Validation': self.history.history['val_loss']}
-        DataFrame.to_hdf(DataFrame.from_dict(accuracy),
-                         path_or_buf=f"{history_dir}/accuracy.hdf5",
-                         key='history',
-                         mode='w')
-        DataFrame.to_hdf(DataFrame.from_dict(loss),
-                         path_or_buf=f"{history_dir}/loss.hdf5",
-                         key='history',
-                         mode='w')
-
-    # Initialize other class attributes
-    def __post_init__(self):
-        self.check_remove_unlabeled()
