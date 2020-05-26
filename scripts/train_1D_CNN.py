@@ -55,16 +55,18 @@ class Train1DCNN(HyperspectralScene):
         self.X_PCA = model_PCA.fit_transform(X=self.X_scale)
         self.features = self.X_PCA.shape[1]
 
-    # Split the data into 60% training, 20% testing, and 20% validation
-    def prepare_data(self):
+    # Split the data into training, testing, and validation sets
+    def prepare_data(self, train_ratio, test_ratio, validation_ratio):
+        split_1 = 1 - train_ratio
+        split_2 = 1 - (0.1/(test_ratio + validation_ratio))
         X_train, X_test, y_train, y_test = train_test_split(self.X_PCA,
                                                             self.y,
-                                                            test_size=0.4,
+                                                            test_size=split_1,
                                                             random_state=42,
                                                             stratify=self.y)
         X_test, X_valid, y_test, y_valid = train_test_split(X_test,
                                                             y_test,
-                                                            test_size=0.5,
+                                                            test_size=split_2,
                                                             random_state=42,
                                                             stratify=y_test)
         self.X_all = np.reshape(a=self.X_PCA, newshape=(-1, self.features, 1))
@@ -113,7 +115,7 @@ class Train1DCNN(HyperspectralScene):
                                       min_lr=1e-6)
         self.model.fit(x=self.X_train,
                        y=self.y_train,
-                       batch_size=256,
+                       batch_size=128,
                        epochs=200,
                        verbose=2,
                        callbacks=[best_weights, log, reduce_LR],

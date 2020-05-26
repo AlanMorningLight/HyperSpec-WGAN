@@ -62,8 +62,8 @@ class Train3DCNN(HyperspectralScene):
             temp[self.y_temp != 0, :] = self.X_PCA
             self.X_PCA = temp
 
-    # Split the data into 60% training, 20% testing, and 20% validation
-    def prepare_data(self):
+    # Split the data into training, testing, and validation sets
+    def prepare_data(self, train_ratio, test_ratio, validation_ratio):
         X = np.reshape(a=self.X_PCA,
                        newshape=(self.image.shape[0],
                                  self.image.shape[1],
@@ -76,16 +76,18 @@ class Train3DCNN(HyperspectralScene):
         X_all = np.reshape(a=X_split, newshape=(-1, side, side, side))
         if self.remove_unlabeled:
             X_all = X_all[self.y_temp != 0, :, :, :]
-        X_train, X_test, y_train, y_test = train_test_split(X_all,
+        split_1 = 1 - train_ratio
+        split_2 = 1 - (0.1/(test_ratio + validation_ratio))
+        X_train, X_rest, y_train, y_rest = train_test_split(X_all,
                                                             self.y,
-                                                            test_size=0.4,
+                                                            test_size=split_1,
                                                             random_state=42,
                                                             stratify=self.y)
-        X_test, X_valid, y_test, y_valid = train_test_split(X_test,
-                                                            y_test,
-                                                            test_size=0.5,
+        X_valid, X_test, y_valid, y_test = train_test_split(X_rest,
+                                                            y_rest,
+                                                            test_size=split_2,
                                                             random_state=42,
-                                                            stratify=y_test)
+                                                            stratify=y_rest)
         self.X_all = np.reshape(a=X_all,
                                 newshape=(-1, side, side, side, 1))
         self.X_train = np.reshape(a=X_train,
@@ -101,12 +103,12 @@ class Train3DCNN(HyperspectralScene):
     # Compile a 3D-CNN model
     def compile_3D_CNN(self):
         inputs = Input(shape=self.X_train.shape[1:])
-        x = Conv3D(filters=32,
+        x = Conv3D(filters=64,
                    kernel_size=(3, 3, 11),
                    bias_constraint=unit_norm())(inputs)
         x = LeakyReLU(alpha=0.2)(x)
         x = Conv3D(filters=32,
-                   kernel_size=(3, 3, 5),
+                   kernel_size=(2, 2, 5),
                    bias_constraint=unit_norm())(x)
         x = LeakyReLU(alpha=0.2)(x)
         x = Flatten()(x)
@@ -134,7 +136,7 @@ class Train3DCNN(HyperspectralScene):
                                       min_lr=1e-6)
         self.model.fit(x=self.X_train,
                        y=self.y_train,
-                       batch_size=256,
+                       batch_size=128,
                        epochs=200,
                        verbose=2,
                        callbacks=[best_weights, log, reduce_LR],
