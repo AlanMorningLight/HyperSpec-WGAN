@@ -58,7 +58,7 @@ class Train1DCNN(HyperspectralScene):
     # Split the data into training, testing, and validation sets
     def prepare_data(self, train_ratio, test_ratio, validation_ratio):
         split_1 = train_ratio
-        split_2 = 0.1/(test_ratio + validation_ratio)
+        split_2 = 0.1 / (test_ratio + validation_ratio)
         X_train, X_rest, y_train, y_rest = train_test_split(self.X_PCA,
                                                             self.y,
                                                             train_size=split_1,

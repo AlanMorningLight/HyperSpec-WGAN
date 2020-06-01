@@ -79,12 +79,12 @@ class EvaluateCNN(HyperspectralScene):
         self.loss = history[['loss', 'val_loss']]
         self.loss.columns = ['Training', 'Validation']
         epoch = self.loss['Validation'].idxmin()
-        self.best_model = {'accuracy': [epoch,
-                                        self.accuracy.iloc[epoch, 0]],
-                           'val_accuracy': [epoch,
-                                            self.accuracy.iloc[epoch, 1]],
-                           'loss': [epoch, self.loss.iloc[epoch, 0]],
-                           'val_loss': [epoch, self.loss.iloc[epoch, 1]]}
+        self.best_model = {
+            'accuracy': [epoch, self.accuracy.iloc[epoch, 0]],
+            'val_accuracy': [epoch, self.accuracy.iloc[epoch, 1]],
+            'loss': [epoch, self.loss.iloc[epoch, 0]],
+            'val_loss': [epoch, self.loss.iloc[epoch, 1]]
+        }
 
     # Load a custom color palette from a *.csv file
     def __load_palette(self, name):
@@ -129,8 +129,8 @@ class EvaluateCNN(HyperspectralScene):
         axes_1 = plt.subplot(gs[1])
         axes_2 = plt.subplot(gs[2])
         accuracy_plot = sb.lineplot(data=self.accuracy,
-                                    palette=sb.color_palette(['#C8102E',
-                                                              '#00B388']),
+                                    palette=sb.color_palette(
+                                        ['#C8102E', '#00B388']),
                                     dashes=False,
                                     ax=axes_0)
         handles, _ = axes_0.get_legend_handles_labels()
@@ -164,8 +164,8 @@ class EvaluateCNN(HyperspectralScene):
                       handler_map={tuple: HandlerTuple(ndivide=None, pad=0.8)})
         axes_1.axis('off')
         loss_plot = sb.lineplot(data=self.loss,
-                                palette=sb.color_palette(['#C8102E',
-                                                          '#00B388']),
+                                palette=sb.color_palette(
+                                    ['#C8102E', '#00B388']),
                                 dashes=False,
                                 legend=False,
                                 ax=axes_2)
@@ -234,8 +234,8 @@ class EvaluateCNN(HyperspectralScene):
                                        xticklabels=False,
                                        yticklabels=False,
                                        ax=axes)
-        ground_truth_plot.set(title=f'{self.name} {self.model_name} '
-                                    f'Predicted Classification Map')
+        ground_truth_plot.set(title=(f'{self.name} {self.model_name} '
+                                     f'Predicted Classification Map'))
         if self.remove_unlabeled:
             colormap = ListedColormap(self.palette[1:])
         else:
@@ -244,14 +244,10 @@ class EvaluateCNN(HyperspectralScene):
                                    ax=axes)
         colorbar_range = colorbar.vmax - colorbar.vmin
         num_labels = len(self.labels)
-        colorbar.set_ticks([colorbar.vmin
-                            + 0.5
-                            * colorbar_range
-                            / num_labels
-                            + i
-                            * colorbar_range
-                            / num_labels
-                            for i in range(num_labels)])
+        colorbar.set_ticks([
+            colorbar.vmin + 0.5 * colorbar_range / num_labels +
+            i * colorbar_range / num_labels for i in range(num_labels)
+        ])
         colorbar.set_ticklabels(self.labels)
         colorbar.outline.set_visible(False)
         colorbar.ax.invert_yaxis()

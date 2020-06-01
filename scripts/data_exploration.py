@@ -75,14 +75,10 @@ class DataExploration(HyperspectralScene):
                                    ax=axes)
         colorbar_range = colorbar.vmax - colorbar.vmin
         num_labels = len(self.labels)
-        colorbar.set_ticks([colorbar.vmin
-                            + 0.5
-                            * colorbar_range
-                            / num_labels
-                            + i
-                            * colorbar_range
-                            / num_labels
-                            for i in range(num_labels)])
+        colorbar.set_ticks([
+            colorbar.vmin + 0.5 * colorbar_range / num_labels +
+            i * colorbar_range / num_labels for i in range(num_labels)
+        ])
         colorbar.set_ticklabels(self.labels)
         colorbar.outline.set_visible(False)
         colorbar.ax.invert_yaxis()

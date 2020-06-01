@@ -65,19 +65,18 @@ class Train3DCNN(HyperspectralScene):
     # Split the data into training, testing, and validation sets
     def prepare_data(self, train_ratio, test_ratio, validation_ratio):
         X = np.reshape(a=self.X_PCA,
-                       newshape=(self.image.shape[0],
-                                 self.image.shape[1],
+                       newshape=(self.image.shape[0], self.image.shape[1],
                                  self.features))
         side = self.features
-        pad = (side - 1)//2
-        X_pad = np.pad(array=X, pad_width=((pad,), (pad,), (0,)))
+        pad = (side - 1) // 2
+        X_pad = np.pad(array=X, pad_width=((pad, ), (pad, ), (0, )))
         X_split = view_as_windows(arr_in=X_pad,
                                   window_shape=(side, side, side))
         X_all = np.reshape(a=X_split, newshape=(-1, side, side, side))
         if self.remove_unlabeled:
             X_all = X_all[self.y_temp != 0, :, :, :]
         split_1 = train_ratio
-        split_2 = 0.1/(test_ratio + validation_ratio)
+        split_2 = 0.1 / (test_ratio + validation_ratio)
         X_train, X_rest, y_train, y_rest = train_test_split(X_all,
                                                             self.y,
                                                             train_size=split_1,
@@ -88,12 +87,10 @@ class Train3DCNN(HyperspectralScene):
                                                             test_size=split_2,
                                                             random_state=42,
                                                             stratify=y_rest)
-        self.X_all = np.reshape(a=X_all,
-                                newshape=(-1, side, side, side, 1))
+        self.X_all = np.reshape(a=X_all, newshape=(-1, side, side, side, 1))
         self.X_train = np.reshape(a=X_train,
                                   newshape=(-1, side, side, side, 1))
-        self.X_test = np.reshape(a=X_test,
-                                 newshape=(-1, side, side, side, 1))
+        self.X_test = np.reshape(a=X_test, newshape=(-1, side, side, side, 1))
         self.X_valid = np.reshape(a=X_valid,
                                   newshape=(-1, side, side, side, 1))
         self.y_train = y_train
