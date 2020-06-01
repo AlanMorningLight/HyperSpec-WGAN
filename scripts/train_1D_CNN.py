@@ -57,18 +57,18 @@ class Train1DCNN(HyperspectralScene):
 
     # Split the data into training, testing, and validation sets
     def prepare_data(self, train_ratio, test_ratio, validation_ratio):
-        split_1 = 1 - train_ratio
-        split_2 = 1 - (0.1/(test_ratio + validation_ratio))
-        X_train, X_test, y_train, y_test = train_test_split(self.X_PCA,
+        split_1 = train_ratio
+        split_2 = 0.1/(test_ratio + validation_ratio)
+        X_train, X_rest, y_train, y_rest = train_test_split(self.X_PCA,
                                                             self.y,
-                                                            test_size=split_1,
+                                                            train_size=split_1,
                                                             random_state=42,
                                                             stratify=self.y)
-        X_test, X_valid, y_test, y_valid = train_test_split(X_test,
-                                                            y_test,
+        X_test, X_valid, y_test, y_valid = train_test_split(X_rest,
+                                                            y_rest,
                                                             test_size=split_2,
                                                             random_state=42,
-                                                            stratify=y_test)
+                                                            stratify=y_rest)
         self.X_all = np.reshape(a=self.X_PCA, newshape=(-1, self.features, 1))
         self.X_train = np.reshape(a=X_train, newshape=(-1, self.features, 1))
         self.X_test = np.reshape(a=X_test, newshape=(-1, self.features, 1))

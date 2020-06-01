@@ -76,11 +76,11 @@ class Train3DCNN(HyperspectralScene):
         X_all = np.reshape(a=X_split, newshape=(-1, side, side, side))
         if self.remove_unlabeled:
             X_all = X_all[self.y_temp != 0, :, :, :]
-        split_1 = 1 - train_ratio
-        split_2 = 1 - (0.1/(test_ratio + validation_ratio))
+        split_1 = train_ratio
+        split_2 = 0.1/(test_ratio + validation_ratio)
         X_train, X_rest, y_train, y_rest = train_test_split(X_all,
                                                             self.y,
-                                                            test_size=split_1,
+                                                            train_size=split_1,
                                                             random_state=42,
                                                             stratify=self.y)
         X_valid, X_test, y_valid, y_test = train_test_split(X_rest,
