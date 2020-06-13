@@ -58,7 +58,7 @@ class Train3DCNN(HyperspectralScene):
         self.X_PCA = model_PCA.fit_transform(X=self.X_scale)
         self.features = self.X_PCA.shape[1]
         if self.remove_unlabeled:
-            temp = np.zeros(shape=(len(self.y_temp), self.features))
+            temp = np.empty(shape=(len(self.y_temp), self.features))
             temp[self.y_temp != 0, :] = self.X_PCA
             self.X_PCA = temp
 
