@@ -60,7 +60,7 @@ class GenerateSamples(HyperspectralScene):
         self.y_class = self.y[self.y == class_num]
         self.class_samples = self.X_class.shape[0]
         self.samples_mean_std = self.__samples_mean_std(X=self.X_class)
-        self.latent_features = self.features // 8
+        self.latent_features = self.features // 2
         self.generator = self.__design_generator()
         self.discriminator = self.__compile_discriminator()
         self.wgan = self.__compile_WGAN()
@@ -84,40 +84,56 @@ class GenerateSamples(HyperspectralScene):
     # Design the generator
     def __design_generator(self):
         inputs = Input(shape=self.latent_features)
-        x = Dense(units=(self.features * 8),
-                  kernel_initializer=RandomNormal(stddev=0.02),
-                  input_dim=self.latent_features)(inputs)
+        x = Dense(units=(self.latent_features * 2),
+                  kernel_initializer=RandomNormal(stddev=0.02))(inputs)
         x = LeakyReLU(alpha=0.2)(x)
-        x = Reshape(target_shape=(self.latent_features * 2, 32))(x)
+        x = Reshape(target_shape=(self.latent_features * 2, 1))(x)
         x = Conv1DTranspose(filters=32,
-                            kernel_size=4,
+                            kernel_size=3,
+                            strides=2,
+                            padding='same',
+                            kernel_initializer=RandomNormal(stddev=0.02))(x)
+        x = LeakyReLU(alpha=0.2)(x)
+        x = Conv1DTranspose(filters=64,
+                            kernel_size=7,
                             strides=2,
                             padding='same',
                             kernel_initializer=RandomNormal(stddev=0.02))(x)
         x = LeakyReLU(alpha=0.2)(x)
         x = Conv1DTranspose(filters=32,
-                            kernel_size=4,
+                            kernel_size=11,
                             strides=2,
                             padding='same',
                             kernel_initializer=RandomNormal(stddev=0.02))(x)
         x = LeakyReLU(alpha=0.2)(x)
-        outputs = Conv1D(filters=1,
-                         kernel_size=50,
-                         padding='same',
-                         activation='tanh',
-                         kernel_initializer=RandomNormal(stddev=0.02))(x)
+        x = Conv1D(filters=1,
+                   kernel_size=3,
+                   padding='same',
+                   kernel_initializer=RandomNormal(stddev=0.02))(x)
+        x = LeakyReLU(alpha=0.2)(x)
+        x = Flatten()(x)
+        x = Dense(units=self.features)(x)
+        outputs = LeakyReLU(alpha=0.2)(x)
         model = Model(inputs=inputs, outputs=outputs)
         return model
 
     # Compile the discriminator
     def __compile_discriminator(self):
-        inputs = Input(shape=(self.features, 1))
+        inputs = Input(shape=self.features)
+        x = Reshape(target_shape=(self.features, 1))(inputs)
         x = Conv1D(filters=32,
-                   kernel_size=5,
+                   kernel_size=3,
                    strides=2,
                    padding='same',
                    kernel_initializer=RandomNormal(stddev=0.02),
-                   kernel_constraint=GradientClipping(clip_value=0.01))(inputs)
+                   kernel_constraint=GradientClipping(clip_value=0.01))(x)
+        x = LeakyReLU(alpha=0.2)(x)
+        x = Conv1D(filters=64,
+                   kernel_size=7,
+                   strides=2,
+                   padding='same',
+                   kernel_initializer=RandomNormal(stddev=0.02),
+                   kernel_constraint=GradientClipping(clip_value=0.01))(x)
         x = LeakyReLU(alpha=0.2)(x)
         x = Conv1D(filters=32,
                    kernel_size=11,
@@ -127,7 +143,12 @@ class GenerateSamples(HyperspectralScene):
                    kernel_constraint=GradientClipping(clip_value=0.01))(x)
         x = LeakyReLU(alpha=0.2)(x)
         x = Flatten()(x)
-        outputs = Dense(units=1)(x)
+        x = Dense(units=self.latent_features)(x)
+        x = LeakyReLU(alpha=0.2)(x)
+        x = Dense(units=self.latent_features // 2)(x)
+        x = LeakyReLU(alpha=0.2)(x)
+        x = Dense(units=1)(x)
+        outputs = LeakyReLU(alpha=0.2)(x)
         model = Model(inputs=inputs, outputs=outputs)
         model.compile(loss=self.__wasserstein_loss,
                       optimizer=RMSprop(lr=0.00005))
@@ -237,11 +258,11 @@ class GenerateSamples(HyperspectralScene):
                                                      self.latent_features))
             y_wgan = -np.ones(shape=(batch_size, 1))
             self.wgan_history[i] = self.wgan.train_on_batch(x=X_wgan, y=y_wgan)
-            print((f'Step: {i} - '
+            print((f'Step: {i + 1} - '
                    f'Real Loss: {self.real_disc_history[i]:.4f} - '
                    f'Fake Loss: {self.fake_disc_history[i]:.4f} - '
                    f'WGAN Loss: {self.wgan_history[i]:.4f}'))
-            if (i + 1) % (batch_size * 10) == 0:
+            if (i + 1) % (batch_size) == 0:
                 X_gen, _ = self.__fake_samples(num_samples=self.class_samples)
-                X_gen_mean_std = self.__samples_mean_std(X=X_gen[:, :, 0])
+                X_gen_mean_std = self.__samples_mean_std(X=X_gen)
                 self.__plot_training_samples(data=X_gen_mean_std, epoch=epoch)
