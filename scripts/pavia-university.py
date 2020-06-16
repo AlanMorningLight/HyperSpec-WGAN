@@ -4,6 +4,7 @@ from copy import copy
 
 from data_exploration import DataExploration
 from evaluate_CNN import EvaluateCNN
+from generate_samples import GenerateSamples
 from hyperspectral_scene import HyperspectralScene
 from train_1D_CNN import Train1DCNN
 from train_3D_CNN import Train3DCNN
@@ -129,3 +130,12 @@ pu_3D_CNN_eval.plot_training_history(figsize=(9, 6.5))
 pu_3D_CNN_eval.generate_report()
 pu_3D_CNN_eval.plot_confusion_matrix(figsize=(6.5, 6.5))
 pu_3D_CNN_eval.plot_predicted(figsize=(6.5, 8))
+
+# Generate fake samples for Pavia University with a WGAN
+pu_WGAN = copy(pu)
+pu_WGAN.__class__ = GenerateSamples
+for i in range(len(pu.labels) - 1):
+    pu_WGAN.__post_init__(class_num=i + 1)
+    pu_WGAN.fit_scaler(feature_range=(-1, 1))
+    pu_WGAN.train_WGAN(batch_size=128, epochs=200, update_disc_rate=5)
+    pu_WGAN.save_generated_samples()
