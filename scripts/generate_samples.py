@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import seaborn as sb
+from h5py import File
 from matplotlib import pyplot as plt
 from matplotlib.gridspec import GridSpec
 from pandas import DataFrame
@@ -51,7 +52,7 @@ class GenerateSamples(HyperspectralScene):
     X_scale: np.ndarray
     real_disc_history: np.ndarray
     fake_disc_history: np.ndarray
-    wgan_history: np.ndarray
+    generator_history: np.ndarray
 
     def __post_init__(self, class_num):
         self.class_num = class_num
@@ -60,7 +61,7 @@ class GenerateSamples(HyperspectralScene):
         self.y_class = self.y[self.y == class_num]
         self.class_samples = self.X_class.shape[0]
         self.samples_mean_std = self.__samples_mean_std(X=self.X_class)
-        self.latent_features = self.features // 2
+        self.latent_features = self.features // 8
         self.generator = self.__design_generator()
         self.discriminator = self.__compile_discriminator()
         self.wgan = self.__compile_WGAN()
@@ -84,36 +85,32 @@ class GenerateSamples(HyperspectralScene):
     # Design the generator
     def __design_generator(self):
         inputs = Input(shape=self.latent_features)
-        x = Dense(units=(self.latent_features * 2),
+        x = Dense(units=self.latent_features * 32,
                   kernel_initializer=RandomNormal(stddev=0.02))(inputs)
         x = LeakyReLU(alpha=0.2)(x)
-        x = Reshape(target_shape=(self.latent_features * 2, 1))(x)
+        x = Reshape(target_shape=(self.latent_features, 32))(x)
         x = Conv1DTranspose(filters=32,
-                            kernel_size=3,
-                            strides=2,
-                            padding='same',
-                            kernel_initializer=RandomNormal(stddev=0.02))(x)
-        x = LeakyReLU(alpha=0.2)(x)
-        x = Conv1DTranspose(filters=64,
-                            kernel_size=7,
+                            kernel_size=4,
                             strides=2,
                             padding='same',
                             kernel_initializer=RandomNormal(stddev=0.02))(x)
         x = LeakyReLU(alpha=0.2)(x)
         x = Conv1DTranspose(filters=32,
-                            kernel_size=11,
+                            kernel_size=4,
                             strides=2,
                             padding='same',
                             kernel_initializer=RandomNormal(stddev=0.02))(x)
         x = LeakyReLU(alpha=0.2)(x)
-        x = Conv1D(filters=1,
-                   kernel_size=3,
-                   padding='same',
-                   kernel_initializer=RandomNormal(stddev=0.02))(x)
+        x = Conv1DTranspose(filters=32,
+                            kernel_size=4,
+                            strides=2,
+                            padding='same',
+                            kernel_initializer=RandomNormal(stddev=0.02))(x)
         x = LeakyReLU(alpha=0.2)(x)
         x = Flatten()(x)
-        x = Dense(units=self.features)(x)
-        outputs = LeakyReLU(alpha=0.2)(x)
+        outputs = Dense(units=self.features,
+                        activation='tanh',
+                        kernel_initializer=RandomNormal(stddev=0.02))(x)
         model = Model(inputs=inputs, outputs=outputs)
         return model
 
@@ -122,33 +119,21 @@ class GenerateSamples(HyperspectralScene):
         inputs = Input(shape=self.features)
         x = Reshape(target_shape=(self.features, 1))(inputs)
         x = Conv1D(filters=32,
-                   kernel_size=3,
-                   strides=2,
-                   padding='same',
-                   kernel_initializer=RandomNormal(stddev=0.02),
-                   kernel_constraint=GradientClipping(clip_value=0.01))(x)
-        x = LeakyReLU(alpha=0.2)(x)
-        x = Conv1D(filters=64,
-                   kernel_size=7,
+                   kernel_size=4,
                    strides=2,
                    padding='same',
                    kernel_initializer=RandomNormal(stddev=0.02),
                    kernel_constraint=GradientClipping(clip_value=0.01))(x)
         x = LeakyReLU(alpha=0.2)(x)
         x = Conv1D(filters=32,
-                   kernel_size=11,
-                   strides=2,
+                   kernel_size=4,
                    padding='same',
+                   strides=2,
                    kernel_initializer=RandomNormal(stddev=0.02),
                    kernel_constraint=GradientClipping(clip_value=0.01))(x)
         x = LeakyReLU(alpha=0.2)(x)
         x = Flatten()(x)
-        x = Dense(units=self.latent_features)(x)
-        x = LeakyReLU(alpha=0.2)(x)
-        x = Dense(units=self.latent_features // 2)(x)
-        x = LeakyReLU(alpha=0.2)(x)
-        x = Dense(units=1)(x)
-        outputs = LeakyReLU(alpha=0.2)(x)
+        outputs = Dense(units=1)(x)
         model = Model(inputs=inputs, outputs=outputs)
         model.compile(loss=self.__wasserstein_loss,
                       optimizer=RMSprop(lr=0.00005))
@@ -156,10 +141,12 @@ class GenerateSamples(HyperspectralScene):
 
     # Compile the WGAN
     def __compile_WGAN(self):
-        self.discriminator.trainable = False
+        generator = self.generator
+        discriminator = self.discriminator
+        discriminator.trainable = False
         model = Sequential()
-        model.add(layer=self.generator)
-        model.add(layer=self.discriminator)
+        model.add(layer=generator)
+        model.add(layer=discriminator)
         model.compile(loss=self.__wasserstein_loss,
                       optimizer=RMSprop(lr=0.00005))
         return model
@@ -187,6 +174,7 @@ class GenerateSamples(HyperspectralScene):
         figure, axes = plt.subplots(constrained_layout=True)
         return figure, axes
 
+    # Plot generated samples at a specific epoch with class samples
     def __plot_training_samples(self, data, epoch):
         figure, _ = self.__plot_parameters()
         gs = GridSpec(nrows=3,
@@ -223,7 +211,24 @@ class GenerateSamples(HyperspectralScene):
         actual_samples_plot.set(xlabel='Spectral Band', ylabel='Intensity')
         figure.savefig(fname=(f"{self.path}/plots/wgan/training-history/"
                               f"{self.class_num:02d}-{self.class_label}/"
-                              f"epoch-{epoch:04d}.svg"),
+                              f"epoch-{epoch:03d}.svg"),
+                       format='svg')
+        plt.close(fig=figure)
+
+    # Plot the loss history for the generator and discriminator
+    def __plot_training_history(self, training_history):
+        figure, axes = self.__plot_parameters()
+        history_plot = sb.lineplot(data=training_history,
+                                   palette=sb.color_palette(
+                                       ['#C8102E', '#00B388', '#F6BE00']),
+                                   dashes=False,
+                                   ax=axes)
+        history_plot.set(title=f'{self.class_label} Training History',
+                         xlabel='Training Steps',
+                         ylabel='Loss')
+        figure.savefig(fname=(f"{self.path}/plots/wgan/training-history/"
+                              f"{self.class_num:02d}-{self.class_label}"
+                              f"-loss.svg"),
                        format='svg')
         plt.close(fig=figure)
 
@@ -238,11 +243,11 @@ class GenerateSamples(HyperspectralScene):
         fake_disc_loss = np.empty(shape=update_disc_rate)
         self.real_disc_history = np.empty(shape=(batch_size * epochs))
         self.fake_disc_history = np.empty(shape=(batch_size * epochs))
-        self.wgan_history = np.empty(shape=(batch_size * epochs))
+        self.generator_history = np.empty(shape=(batch_size * epochs))
         for i in range(batch_size * epochs):
             epoch = (i + batch_size) // batch_size
             if i % batch_size == 0:
-                print(f'Epoch: {epoch:04d}/{epochs}')
+                print(f'Epoch: {epoch}/{epochs}')
             for j in range(update_disc_rate):
                 X_real, y_real = self.__real_samples(num_samples=batch_size //
                                                      2)
@@ -257,12 +262,30 @@ class GenerateSamples(HyperspectralScene):
             X_wgan = np.random.standard_normal(size=(batch_size,
                                                      self.latent_features))
             y_wgan = -np.ones(shape=(batch_size, 1))
-            self.wgan_history[i] = self.wgan.train_on_batch(x=X_wgan, y=y_wgan)
-            print((f'Step: {i + 1} - '
-                   f'Real Loss: {self.real_disc_history[i]:.4f} - '
-                   f'Fake Loss: {self.fake_disc_history[i]:.4f} - '
-                   f'WGAN Loss: {self.wgan_history[i]:.4f}'))
-            if (i + 1) % (batch_size) == 0:
+            self.generator_history[i] = self.wgan.train_on_batch(x=X_wgan,
+                                                                 y=y_wgan)
+            print((f'Step: {i + 1} | '
+                   f'Discriminator Loss - Real Samples: '
+                   f'{self.real_disc_history[i]:.4f} | '
+                   f'Discriminator Loss - Fake Samples: '
+                   f'{self.fake_disc_history[i]:.4f} | '
+                   f'Generator Loss: {self.generator_history[i]:.4f}'))
+            if (i + 1) % (batch_size * 5) == 0:
                 X_gen, _ = self.__fake_samples(num_samples=self.class_samples)
                 X_gen_mean_std = self.__samples_mean_std(X=X_gen)
                 self.__plot_training_samples(data=X_gen_mean_std, epoch=epoch)
+        training_history = DataFrame(
+            data={
+                'Discriminator Loss - Real Samples': self.real_disc_history,
+                'Discriminator Loss - Fake Samples': self.fake_disc_history,
+                'Generator Loss': self.generator_history
+            })
+        self.__plot_training_history(training_history)
+
+    # Generate samples using the generator and save to an *.hdf5 file
+    def save_generated_samples(self):
+        X_gen, _ = self.__fake_samples(num_samples=self.class_samples)
+        with File(name=(f"{self.path}/data/generated-samples/"
+                        f"{self.class_num:02d}-{self.class_label}.hdf5"),
+                  mode='w') as file:
+            file.create_dataset(name='X_gen', data=X_gen)
